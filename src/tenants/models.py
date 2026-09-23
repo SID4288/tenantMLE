@@ -15,10 +15,9 @@ class Tenant(models.Model):
         choices=TenantStatus.choices,
         default=TenantStatus.TRIAL_ACTIVE,
     )
+
     trial_started_at = models.DateTimeField()
     trial_ends_at = models.DateTimeField()
-    
-    tenant = models.ForeignKey('tenants.Tenant', on_delete=models.CASCADE, null=True, blank=True, related_name='users')
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
