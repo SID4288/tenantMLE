@@ -22,3 +22,17 @@ class IsTenantAdmin(BasePermission):
 class IsTenantUser(BasePermission):
     def has_permission(self, request, view):
         return request.user.is_authenticated and request.user.role == UserRole.TENANT_USER
+
+class IsUserManager(BasePermission):
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+
+        if request.user.role in [
+            UserRole.SUPER_ADMIN,
+            UserRole.ADMIN,
+            UserRole.TENANT_ADMIN,
+        ]:
+            return True
+
+        return False

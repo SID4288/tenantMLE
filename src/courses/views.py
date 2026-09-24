@@ -38,3 +38,11 @@ class CourseViewSet(ModelViewSet):
             serializer.save(tenant=user.tenant)
         else:
             serializer.save()
+
+    def perform_update(self, serializer):
+        user = self.request.user
+
+        if user.role == UserRole.TENANT_ADMIN:
+            serializer.save(tenant=user.tenant)
+        else:
+            serializer.save()
