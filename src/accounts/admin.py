@@ -1,10 +1,48 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-# Register your models here.
+
 from .models import User
+
 
 @admin.register(User)
 class CustomUserAdmin(UserAdmin):
-    list_display = ( "email","username","role","tenant","is_active",)
-    list_filter = ( "role","is_active", "tenant")
-    search_fields = ( "email", "username")
+    fieldsets = UserAdmin.fieldsets + (
+        (
+            "Platform / Tenant",
+            {
+                "fields": (
+                    "role",
+                    "tenant",
+                )
+            },
+        ),
+    )
+
+    add_fieldsets = UserAdmin.add_fieldsets + (
+        (
+            "Platform / Tenant",
+            {
+                "fields": (
+                    "email",
+                    "role",
+                    "tenant",
+                )
+            },
+        ),
+    )
+
+    list_display = (
+        "username",
+        "email",
+        "role",
+        "tenant",
+        "is_active",
+        "is_staff",
+    )
+
+    list_filter = (
+        "role",
+        "tenant",
+        "is_active",
+        "is_staff",
+    )
