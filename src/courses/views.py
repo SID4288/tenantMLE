@@ -15,7 +15,7 @@ class CourseViewSet(ModelViewSet):
     def get_queryset(self):
         user = self.request.user
 
-        if user.role in [UserRole.SUPER_ADMIN, UserRole.ADMIN]:
+        if user.role in [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.SUPER_VIEWER]:
             return Course.objects.all()
 
         if user.role == UserRole.TENANT_ADMIN:
