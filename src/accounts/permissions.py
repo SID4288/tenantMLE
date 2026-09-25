@@ -58,4 +58,8 @@ class IsTenantActive(BasePermission):
         # Refresh the tenant lifecycle state before checking access.
         user.tenant.refresh_status()
 
-        return user.tenant.status != TenantStatus.EXPIRED
+        # Rejected (and expired) tenants are cut off entirely.
+        return user.tenant.status not in (
+            TenantStatus.EXPIRED,
+            TenantStatus.REJECTED,
+        )

@@ -17,6 +17,10 @@ class User(AbstractUser):
         default=UserRole.TENANT_USER,
     )
     tenant = models.ForeignKey('tenants.Tenant', on_delete=models.PROTECT, null=True, blank=True, related_name='users')
+    # Forced password rotation (e.g. first login with a one-time temp password).
+    must_change_password = models.BooleanField(default=False)
+    # Ensures the one-time temp password is revealed exactly once.
+    temp_password_revealed = models.BooleanField(default=False)
 
 
     created_at = models.DateTimeField(auto_now_add=True)
