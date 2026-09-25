@@ -6,6 +6,8 @@ class TenantStatus(models.TextChoices):
     TRIAL_ACTIVE = "TRIAL_ACTIVE", "Trial Active"
     EXPIRED = "EXPIRED", "Expired"
     ACTIVE = "ACTIVE", "Active"
+    PENDING = "PENDING", "Pending"
+    REJECTED = "REJECTED", "Rejected"
 
 
 class Tenant(models.Model):
