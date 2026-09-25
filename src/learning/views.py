@@ -10,22 +10,21 @@ from .serializers import (
     LearningProgressSerializer,
 )
 from django.utils import timezone
-
+from accounts.permissions import IsTenantActive
 
 class CourseAssignmentViewSet(ModelViewSet):
     serializer_class = CourseAssignmentSerializer
 
     def get_permissions(self):
+        permission_classes = [
+            IsAuthenticated,
+            IsTenantActive,
+        ]
+
         if self.action in ["create", "update", "partial_update", "destroy"]:
-            permission_classes = [
-                IsAuthenticated,
-                IsAssignmentManager,
-            ]
-        else:
-            permission_classes = [IsAuthenticated]
+            permission_classes.append(IsAssignmentManager)
 
         return [permission() for permission in permission_classes]
-
     def get_queryset(self):
         user = self.request.user
 
@@ -62,13 +61,13 @@ class LearningProgressViewSet(ModelViewSet):
     serializer_class = LearningProgressSerializer
 
     def get_permissions(self):
+        permission_classes = [
+            IsAuthenticated,
+            IsTenantActive,
+        ]
+
         if self.action in ["create", "update", "partial_update", "destroy"]:
-            permission_classes = [
-                IsAuthenticated,
-                IsProgressManager,
-            ]
-        else:
-            permission_classes = [IsAuthenticated]
+            permission_classes.append(IsProgressManager)
 
         return [permission() for permission in permission_classes]
 

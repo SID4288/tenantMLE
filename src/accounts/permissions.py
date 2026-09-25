@@ -1,5 +1,5 @@
 from rest_framework.permissions import BasePermission
-
+from tenants.models import TenantStatus
 from .models import UserRole
 
 
@@ -28,11 +28,34 @@ class IsUserManager(BasePermission):
         if not request.user.is_authenticated:
             return False
 
-        if request.user.role in [
+        if request.user.role == UserRole.SUPER_VIEWER:
+            return request.method in ["GET", "HEAD", "OPTIONS"]
+
+        return request.user.role in [
             UserRole.SUPER_ADMIN,
             UserRole.ADMIN,
             UserRole.TENANT_ADMIN,
+        ]
+class IsTenantActive(BasePermission):
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+
+        user = request.user
+
+        # Platform-level users are not restricted by tenant expiration.
+        if user.role in [
+            UserRole.SUPER_ADMIN,
+            UserRole.ADMIN,
+            UserRole.SUPER_VIEWER,
         ]:
             return True
 
-        return False
+        # Tenant users must belong to a tenant.
+        if not user.tenant:
+            return False
+
+        # Refresh the tenant lifecycle state before checking access.
+        user.tenant.refresh_status()
+
+        return user.tenant.status != TenantStatus.EXPIRED

@@ -42,14 +42,20 @@ class UserSerializer(serializers.ModelSerializer):
                     "You cannot manage users outside your tenant."
                 )
 
-            # Tenant Admin cannot create or promote platform-level roles.
-            if role != "TENANT_USER":
+            # Tenant Admin can only manage Tenant Users.
+            if role is not None and role != "TENANT_USER":
+                raise serializers.ValidationError(
+                    "Tenant Admins can only manage Tenant Users."
+                )
+
+            # Prevent changing an existing Tenant User into another role
+            # when the role is omitted from a partial update.
+            if self.instance and self.instance.role != "TENANT_USER":
                 raise serializers.ValidationError(
                     "Tenant Admins can only manage Tenant Users."
                 )
 
         return attrs
-
     def create(self, validated_data):
         password = validated_data.pop("password", None)
 

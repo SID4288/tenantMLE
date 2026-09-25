@@ -7,6 +7,7 @@ from .models import Course
 from .serializers import CourseSerializer
 from accounts.models import UserRole
 from .permissions import IsCourseManager
+from accounts.permissions import IsTenantActive
 class CourseViewSet(ModelViewSet):
     serializer_class = CourseSerializer
     permission_classes = [IsAuthenticated]
@@ -23,13 +24,15 @@ class CourseViewSet(ModelViewSet):
         return Course.objects.none()
 
     def get_permissions(self):
+        permission_classes = [
+            IsAuthenticated,
+            IsTenantActive,
+        ]
 
-        if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            self.permission_classes = [IsAuthenticated, IsCourseManager]
-        else:
-            self.permission_classes = [IsAuthenticated]
+        if self.action in ["create", "update", "partial_update", "destroy"]:
+            permission_classes.append(IsCourseManager)
 
-        return [permission() for permission in self.permission_classes]
+        return [permission() for permission in permission_classes]
 
     def perform_create(self, serializer):
         user = self.request.user
