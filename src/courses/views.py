@@ -18,8 +18,14 @@ class CourseViewSet(ModelViewSet):
         if user.role in [UserRole.SUPER_ADMIN, UserRole.ADMIN]:
             return Course.objects.all()
 
-        if user.role in [UserRole.TENANT_ADMIN, UserRole.TENANT_USER]:
+        if user.role == UserRole.TENANT_ADMIN:
             return Course.objects.filter(tenant_id=user.tenant_id)
+
+        if user.role == UserRole.TENANT_USER:
+            return Course.objects.filter(
+                tenant_id=user.tenant_id,
+                assignments__user_id=user.id,
+            ).distinct()
 
         return Course.objects.none()
 

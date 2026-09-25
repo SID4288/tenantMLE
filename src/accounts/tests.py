@@ -200,6 +200,27 @@ class UserManagementTests(APITestCase):
         self.assertEqual(created_user.tenant_id, self.tenant_a.id)
         self.assertEqual(created_user.role, UserRole.TENANT_USER)
 
+    def test_platform_admin_cannot_create_tenant_user_without_tenant(self):
+        platform_admin = User.objects.create_user(
+            username="platform-admin-create",
+            email="platform-admin-create@example.com",
+            role=UserRole.ADMIN,
+        )
+        self.client.force_authenticate(user=platform_admin)
+
+        response = self.client.post(
+            reverse("user-list"),
+            {
+                "username": "orphan-user",
+                "email": "orphan-user@example.com",
+                "password": "password123",
+                "role": UserRole.TENANT_USER,
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(User.objects.filter(username="orphan-user").exists())
+
     def test_tenant_admin_cannot_create_admin(self):
         self.client.force_authenticate(user=self.tenant_admin)
 
@@ -255,6 +276,66 @@ class UserManagementTests(APITestCase):
             self.tenant_a_user.role,
             UserRole.TENANT_USER,
         )
+
+    def test_admin_cannot_promote_user_to_super_admin(self):
+        platform_admin = User.objects.create_user(
+            username="platform-admin",
+            email="platform-admin@example.com",
+            role=UserRole.ADMIN,
+        )
+        self.client.force_authenticate(user=platform_admin)
+
+        response = self.client.patch(
+            reverse(
+                "user-detail",
+                kwargs={"pk": self.tenant_a_user.id},
+            ),
+            {"role": UserRole.SUPER_ADMIN},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        self.tenant_a_user.refresh_from_db()
+        self.assertEqual(self.tenant_a_user.role, UserRole.TENANT_USER)
+
+    def test_expired_tenant_admin_cannot_manage_users(self):
+        self.tenant_a.status = TenantStatus.EXPIRED
+        self.tenant_a.save()
+        self.client.force_authenticate(user=self.tenant_admin)
+
+        responses = [
+            self.client.get(reverse("user-list")),
+            self.client.post(
+                reverse("user-list"),
+                {
+                    "username": "expired-user",
+                    "email": "expired-user@example.com",
+                    "password": "password123",
+                    "role": UserRole.TENANT_USER,
+                },
+            ),
+            self.client.patch(
+                reverse(
+                    "user-detail",
+                    kwargs={"pk": self.tenant_a_user.id},
+                ),
+                {"email": "changed@example.com"},
+            ),
+            self.client.delete(
+                reverse(
+                    "user-detail",
+                    kwargs={"pk": self.tenant_a_user.id},
+                )
+            ),
+        ]
+
+        for response in responses:
+            self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        self.assertTrue(
+            User.objects.filter(id=self.tenant_a_user.id).exists()
+        )
+
     def test_super_viewer_can_list_users(self):
         super_viewer = User.objects.create_user(
             username="super-viewer",

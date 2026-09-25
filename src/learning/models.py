@@ -14,6 +14,14 @@ class CourseAssignment(models.Model):
     )
     assigned_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["course", "user"],
+                name="unique_course_assignment",
+            ),
+        ]
+
     def __str__(self):
         return f"{self.user.email} → {self.course.title}"
 

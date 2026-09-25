@@ -6,6 +6,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from accounts.models import User, UserRole
+from learning.models import CourseAssignment
 from tenants.models import Tenant, TenantStatus
 from .models import Course
 
@@ -54,17 +55,32 @@ class CourseAPITests(APITestCase):
             role=UserRole.TENANT_ADMIN,
             tenant=self.tenant_b,
         )
+        self.platform_admin = User.objects.create_user(
+            username="platform-admin",
+            email="platform-admin@example.com",
+            role=UserRole.ADMIN,
+        )
 
         self.course_a = Course.objects.create(
             tenant=self.tenant_a,
             title="Tenant A Course",
             description="Course for tenant A",
         )
+        self.course_a_unassigned = Course.objects.create(
+            tenant=self.tenant_a,
+            title="Tenant A Unassigned Course",
+            description="Unassigned course for tenant A",
+        )
 
         self.course_b = Course.objects.create(
             tenant=self.tenant_b,
             title="Tenant B Course",
             description="Course for tenant B",
+        )
+
+        CourseAssignment.objects.create(
+            course=self.course_a,
+            user=self.user_a,
         )
 
     def test_tenant_admin_can_create_course(self):
@@ -84,6 +100,39 @@ class CourseAPITests(APITestCase):
 
         self.assertEqual(course.tenant_id, self.tenant_a.id)
 
+    def test_platform_admin_can_create_course_for_any_tenant(self):
+        self.client.force_authenticate(user=self.platform_admin)
+
+        response = self.client.post(
+            reverse("course-list"),
+            {
+                "tenant": self.tenant_b.id,
+                "title": "Platform Course",
+                "description": "Created by platform admin",
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        course = Course.objects.get(title="Platform Course")
+        self.assertEqual(course.tenant_id, self.tenant_b.id)
+
+    def test_super_viewer_can_read_but_not_modify_courses(self):
+        super_viewer = User.objects.create_user(
+            username="super-viewer",
+            email="super-viewer@example.com",
+            role=UserRole.SUPER_VIEWER,
+        )
+        self.client.force_authenticate(user=super_viewer)
+
+        read_response = self.client.get(reverse("course-list"))
+        update_response = self.client.patch(
+            reverse("course-detail", args=[self.course_a.id]),
+            {"title": "Unauthorized Update"},
+        )
+
+        self.assertEqual(read_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(update_response.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_tenant_user_cannot_create_course(self):
         self.client.force_authenticate(user=self.user_a)
 
@@ -97,17 +146,35 @@ class CourseAPITests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_tenant_user_can_see_only_own_tenant_courses(self):
+    def test_platform_admin_cannot_create_course_without_tenant(self):
+        self.client.force_authenticate(user=self.platform_admin)
+
+        response = self.client.post(
+            reverse("course-list"),
+            {"title": "Unowned Course"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(Course.objects.filter(title="Unowned Course").exists())
+
+    def test_tenant_user_can_access_assigned_course(self):
         self.client.force_authenticate(user=self.user_a)
 
-        response = self.client.get(reverse("course-list"))
+        response = self.client.get(
+            reverse("course-detail", args=[self.course_a.id])
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["id"], self.course_a.id)
 
-        returned_ids = [course["id"] for course in response.data]
+    def test_tenant_user_cannot_access_unassigned_course_in_own_tenant(self):
+        self.client.force_authenticate(user=self.user_a)
 
-        self.assertIn(self.course_a.id, returned_ids)
-        self.assertNotIn(self.course_b.id, returned_ids)
+        response = self.client.get(
+            reverse("course-detail", args=[self.course_a_unassigned.id])
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_tenant_admin_cannot_access_other_tenant_course(self):
         self.client.force_authenticate(user=self.admin_a)
@@ -139,6 +206,18 @@ class CourseAPITests(APITestCase):
 
         self.course_a.refresh_from_db()
         self.assertEqual(self.course_a.title, "Updated Course")
+
+    def test_tenant_admin_can_delete_own_course(self):
+        self.client.force_authenticate(user=self.admin_a)
+
+        response = self.client.delete(
+            reverse("course-detail", args=[self.course_a_unassigned.id])
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(
+            Course.objects.filter(id=self.course_a_unassigned.id).exists()
+        )
 
     def test_tenant_admin_cannot_delete_other_tenant_course(self):
         self.client.force_authenticate(user=self.admin_a)

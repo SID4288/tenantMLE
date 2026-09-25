@@ -3,7 +3,7 @@ from django.shortcuts import render
 from rest_framework.decorators import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from accounts.permissions import IsSuperAdmin
+from accounts.permissions import IsSuperAdmin, IsTenantActive
 from rest_framework.viewsets import ModelViewSet
 from .permissions import IsUserManager
 from .models import User, UserRole
@@ -61,4 +61,8 @@ class UserViewSet(ModelViewSet):
             serializer.save()
 
     def get_permissions(self):
-        return [IsAuthenticated(), IsUserManager()]
+        return [
+            IsAuthenticated(),
+            IsTenantActive(),
+            IsUserManager(),
+        ]

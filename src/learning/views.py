@@ -2,6 +2,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.response import Response
 from rest_framework import status
+from django.db import transaction
 from accounts.models import UserRole
 from .models import CourseAssignment, LearningProgress
 from .permissions import IsAssignmentManager, IsProgressManager
@@ -52,10 +53,11 @@ class CourseAssignmentViewSet(ModelViewSet):
         return CourseAssignment.objects.none()
 
     def perform_create(self, serializer):
-        assignment = serializer.save()
-        LearningProgress.objects.create(
-            assignment=assignment,
-        )
+        with transaction.atomic():
+            assignment = serializer.save()
+            LearningProgress.objects.create(
+                assignment=assignment,
+            )
 
 class LearningProgressViewSet(ModelViewSet):
     serializer_class = LearningProgressSerializer
@@ -101,10 +103,9 @@ class LearningProgressViewSet(ModelViewSet):
     def perform_update(self, serializer):
         progress = serializer.save()
 
-        if progress.progress_percentage > 0 and progress.started_at is None:
-            progress.started_at = timezone.now()
-
         if progress.progress_percentage == 100 and progress.completed_at is None:
             progress.completed_at = timezone.now()
+        elif progress.progress_percentage < 100:
+            progress.completed_at = None
 
         progress.save()

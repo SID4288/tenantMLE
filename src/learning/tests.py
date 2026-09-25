@@ -1,4 +1,5 @@
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.urls import reverse
 from django.utils import timezone
@@ -66,6 +67,10 @@ class LearningAPITests(APITestCase):
             tenant=self.tenant_a,
             title="Tenant A Course",
         )
+        self.course_a2 = Course.objects.create(
+            tenant=self.tenant_a,
+            title="Tenant A Course 2",
+        )
 
         self.course_b = Course.objects.create(
             tenant=self.tenant_b,
@@ -104,25 +109,86 @@ class LearningAPITests(APITestCase):
         response = self.client.post(
             reverse("assignment-list"),
             {
-                "course": self.course_a.id,
+                "course": self.course_a2.id,
                 "user": self.user_a.id,
             },
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-        self.assertTrue(
-            CourseAssignment.objects.filter(
-                course=self.course_a,
-                user=self.user_a,
-            ).exists()
+        assignment = CourseAssignment.objects.get(
+            course=self.course_a2,
+            user=self.user_a,
         )
-
-        assignment = CourseAssignment.objects.order_by("-id").first()
 
         self.assertTrue(
             LearningProgress.objects.filter(
                 assignment=assignment
+            ).exists()
+        )
+
+    def test_failed_progress_creation_rolls_back_assignment(self):
+        self.client.force_authenticate(user=self.admin_a)
+        assignment_count = CourseAssignment.objects.count()
+        progress_count = LearningProgress.objects.count()
+
+        with patch(
+            "learning.views.LearningProgress.objects.create",
+            side_effect=RuntimeError("progress creation failed"),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.client.post(
+                    reverse("assignment-list"),
+                    {
+                        "course": self.course_a2.id,
+                        "user": self.user_a.id,
+                    },
+                )
+
+        self.assertEqual(CourseAssignment.objects.count(), assignment_count)
+        self.assertEqual(LearningProgress.objects.count(), progress_count)
+
+    def test_duplicate_assignment_is_rejected(self):
+        self.client.force_authenticate(user=self.admin_a)
+
+        response = self.client.post(
+            reverse("assignment-list"),
+            {
+                "course": self.course_a.id,
+                "user": self.user_a.id,
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            CourseAssignment.objects.filter(
+                course=self.course_a,
+                user=self.user_a,
+            ).count(),
+            1,
+        )
+
+    def test_assignment_rejects_user_without_tenant(self):
+        platform_user = User.objects.create_user(
+            username="unowned-user",
+            email="unowned-user@example.com",
+            role=UserRole.ADMIN,
+        )
+        self.client.force_authenticate(user=self.admin_a)
+
+        response = self.client.post(
+            reverse("assignment-list"),
+            {
+                "course": self.course_a2.id,
+                "user": platform_user.id,
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(
+            CourseAssignment.objects.filter(
+                course=self.course_a2,
+                user=platform_user,
             ).exists()
         )
 
@@ -174,6 +240,42 @@ class LearningAPITests(APITestCase):
 
         self.assertIn(self.assignment_a.id, returned_ids)
         self.assertNotIn(self.assignment_b.id, returned_ids)
+
+    def test_tenant_admin_can_manage_assignments_and_progress_in_own_tenant(self):
+        self.client.force_authenticate(user=self.admin_a)
+
+        assignment_response = self.client.get(
+            reverse("assignment-detail", args=[self.assignment_a.id])
+        )
+        progress_response = self.client.patch(
+            reverse("progress-detail", args=[self.progress_a.id]),
+            {"progress_percentage": 75},
+        )
+
+        self.assertEqual(assignment_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(progress_response.status_code, status.HTTP_200_OK)
+        self.progress_a.refresh_from_db()
+        self.assertEqual(self.progress_a.progress_percentage, 75)
+
+    def test_tenant_admin_cannot_manage_other_tenant_learning_data(self):
+        self.client.force_authenticate(user=self.admin_a)
+
+        assignment_response = self.client.get(
+            reverse("assignment-detail", args=[self.assignment_b.id])
+        )
+        progress_response = self.client.patch(
+            reverse("progress-detail", args=[self.progress_b.id]),
+            {"progress_percentage": 75},
+        )
+
+        self.assertEqual(
+            assignment_response.status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+        self.assertEqual(
+            progress_response.status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
 
     def test_tenant_user_cannot_access_other_tenant_assignment(self):
         self.client.force_authenticate(user=self.user_a)
@@ -252,6 +354,28 @@ class LearningAPITests(APITestCase):
             self.progress_a.completed_at
         )
 
+    def test_progress_timestamps_are_server_controlled(self):
+        self.client.force_authenticate(user=self.user_a)
+        original_completed_at = self.progress_a.completed_at
+
+        response = self.client.patch(
+            reverse(
+                "progress-detail",
+                args=[self.progress_a.id],
+            ),
+            {
+                "progress_percentage": 50,
+                "completed_at": timezone.now(),
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.progress_a.refresh_from_db()
+        self.assertEqual(
+            self.progress_a.completed_at,
+            original_completed_at,
+        )
+
     def test_progress_cannot_exceed_100(self):
         self.client.force_authenticate(user=self.user_a)
 
@@ -315,6 +439,39 @@ class LearningAPITests(APITestCase):
             response.status_code,
             status.HTTP_403_FORBIDDEN,
         )
+
+    def test_expired_tenant_admin_cannot_access_learning(self):
+        self.tenant_a.status = TenantStatus.EXPIRED
+        self.tenant_a.save()
+
+        self.client.force_authenticate(user=self.admin_a)
+
+        responses = [
+            self.client.get(reverse("assignment-list")),
+            self.client.get(reverse("progress-list")),
+        ]
+
+        for response in responses:
+            self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_super_viewer_can_read_but_not_modify_learning_data(self):
+        super_viewer = User.objects.create_user(
+            username="super-viewer-learning",
+            email="super-viewer-learning@example.com",
+            role=UserRole.SUPER_VIEWER,
+        )
+        self.client.force_authenticate(user=super_viewer)
+
+        assignment_response = self.client.get(reverse("assignment-list"))
+        progress_response = self.client.get(reverse("progress-list"))
+        update_response = self.client.patch(
+            reverse("progress-detail", args=[self.progress_a.id]),
+            {"progress_percentage": 75},
+        )
+
+        self.assertEqual(assignment_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(progress_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(update_response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_tenant_user_cannot_delete_own_progress(self):
         self.client.force_authenticate(user=self.user_a)

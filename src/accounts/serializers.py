@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User
+from .models import User, UserRole
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -23,7 +23,6 @@ class UserSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id",
-            "tenant",
             "created_at",
             "updated_at",
         ]
@@ -35,25 +34,41 @@ class UserSerializer(serializers.ModelSerializer):
         tenant = attrs.get("tenant")
         role = attrs.get("role")
 
-        if requester.role == "TENANT_ADMIN":
-            # Tenant Admin cannot manage another tenant.
+        if requester.role == UserRole.TENANT_ADMIN:
             if tenant and tenant.id != requester.tenant_id:
                 raise serializers.ValidationError(
                     "You cannot manage users outside your tenant."
                 )
 
-            # Tenant Admin can only manage Tenant Users.
-            if role is not None and role != "TENANT_USER":
+            if role is not None and role != UserRole.TENANT_USER:
                 raise serializers.ValidationError(
                     "Tenant Admins can only manage Tenant Users."
                 )
 
-            # Prevent changing an existing Tenant User into another role
-            # when the role is omitted from a partial update.
-            if self.instance and self.instance.role != "TENANT_USER":
+            if self.instance and self.instance.role != UserRole.TENANT_USER:
                 raise serializers.ValidationError(
                     "Tenant Admins can only manage Tenant Users."
                 )
+
+        if requester.role == UserRole.ADMIN:
+            platform_roles = [
+                UserRole.SUPER_ADMIN,
+                UserRole.ADMIN,
+                UserRole.SUPER_VIEWER,
+            ]
+            if role in platform_roles:
+                raise serializers.ValidationError(
+                    "Admins cannot assign platform-privileged roles."
+                )
+
+        if (
+            role in [UserRole.TENANT_USER, UserRole.TENANT_ADMIN]
+            and requester.role != UserRole.TENANT_ADMIN
+            and not tenant
+        ):
+            raise serializers.ValidationError(
+                "Tenant users and admins must belong to a tenant."
+            )
 
         return attrs
     def create(self, validated_data):
