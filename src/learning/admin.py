@@ -1,43 +1,23 @@
 from django.contrib import admin
 
-from .models import (
-    Assignment,
-    AssignmentProgress,
-    CourseAssignment,
-    LearningProgress,
-)
-
-
-@admin.register(Assignment)
-class AssignmentAdmin(admin.ModelAdmin):
-    list_display = (
-        "title",
-        "course",
-        "order",
-        "created_at",
-        "updated_at",
-    )
-    search_fields = (
-        "title",
-        "description",
-        "task",
-        "course__title",
-    )
-    list_filter = (
-        "course",
-    )
-
-
-@admin.register(AssignmentProgress)
-class AssignmentProgressAdmin(admin.ModelAdmin):
-    pass
+from .models import CourseAssignment, LearningProgress
 
 
 @admin.register(CourseAssignment)
 class CourseAssignmentAdmin(admin.ModelAdmin):
-    pass
+    list_display = ("id", "course", "user", "assigned_at")
+    list_filter = ("course",)
+    search_fields = ("course__title", "user__email")
 
 
 @admin.register(LearningProgress)
 class LearningProgressAdmin(admin.ModelAdmin):
-    pass
+    list_display = (
+        "id",
+        "assignment",
+        "progress_percentage",
+        "started_at",
+        "completed_at",
+        "updated_at",
+    )
+    list_filter = ("progress_percentage",)

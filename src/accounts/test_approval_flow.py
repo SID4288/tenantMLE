@@ -20,7 +20,6 @@ def apply_organization(client, org="Flow Org", admin="flow_admin",
         },
     )
 
-
 def make_super_admin():
     return User.objects.create_user(
         username="flow-superadmin",
@@ -28,7 +27,6 @@ def make_super_admin():
         password="superpass1",
         role=UserRole.SUPER_ADMIN,
     )
-
 
 class TenantApprovalTests(APITestCase):
     def setUp(self):

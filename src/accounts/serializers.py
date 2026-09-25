@@ -4,6 +4,7 @@ from .models import User, UserRole
 from datetime import timedelta
 
 from django.contrib.auth.validators import UnicodeUsernameValidator
+from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
 from django.utils import timezone
 from django.utils.text import slugify
@@ -12,7 +13,6 @@ from tenants.models import Tenant, TenantStatus
 # Tenants an anonymous user is allowed to join via self-registration.
 # PENDING (unapproved) and EXPIRED tenants can never be joined this way.
 JOINABLE_TENANT_STATUSES = [TenantStatus.TRIAL_ACTIVE, TenantStatus.ACTIVE]
-
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(
@@ -109,17 +109,7 @@ class UserSerializer(serializers.ModelSerializer):
         instance.save()
 
         return instance
-
-
 class TenantUserRegistrationSerializer(serializers.ModelSerializer):
-    """Anonymous self-registration as TENANT_USER in an existing tenant.
-
-    The role is fixed server-side: any client-supplied ``role`` is ignored
-    (read-only) so applicants can never escalate to an administrative role.
-    The tenant queryset only exposes joinable tenants, so nonexistent,
-    PENDING, or EXPIRED tenant ids are rejected with a 400.
-    """
-
     password = serializers.CharField(
         write_only=True,
         required=True,
@@ -154,12 +144,6 @@ class TenantUserRegistrationSerializer(serializers.ModelSerializer):
 
 
 class TenantApplicationSerializer(serializers.Serializer):
-    """Anonymous application to create a new organization.
-
-    Creates a PENDING tenant plus its TENANT_ADMIN (inactive, unusable
-    password) atomically. The applicant cannot choose a role.
-    """
-
     organization_name = serializers.CharField(max_length=255)
     admin_name = serializers.CharField(
         max_length=150,
@@ -215,22 +199,26 @@ class TenantApplicationSerializer(serializers.Serializer):
         user.set_unusable_password()
         user.save()
         return user
-
-
 class ChangePasswordSerializer(serializers.Serializer):
-    """Authenticated password change; clears the forced-rotation flag."""
-
     current_password = serializers.CharField(write_only=True)
-    new_password = serializers.CharField(
-        write_only=True, required=True, min_length=8
-    )
+    new_password = serializers.CharField(write_only=True, min_length=8)
 
     def validate_current_password(self, value):
-        if not self.context["request"].user.check_password(value):
-            raise serializers.ValidationError("Current password is incorrect.")
+        user = self.context["request"].user
+
+        if not user.check_password(value):
+            raise serializers.ValidationError(
+                "Current password is incorrect."
+            )
+
         return value
 
-    def save(self):
+    def validate_new_password(self, value):
+        user = self.context["request"].user
+        validate_password(value, user=user)
+        return value
+
+    def save(self, **kwargs):
         user = self.context["request"].user
         user.set_password(self.validated_data["new_password"])
         user.must_change_password = False

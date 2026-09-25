@@ -96,13 +96,6 @@ class TenantViewSet(ModelViewSet):
 
 
 class PublicTenantListView(APIView):
-    """Anonymous list of tenants open for self-registration.
-
-    Only joinable tenants (TRIAL_ACTIVE / ACTIVE) are exposed, with the
-    minimal fields the registration form needs. PENDING and EXPIRED
-    tenants are never listed.
-    """
-
     permission_classes = [AllowAny]
 
     def get(self, request):
