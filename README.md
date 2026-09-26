@@ -51,8 +51,11 @@ From the project root, with the virtual environment activated:
 ```powershell
 Set-Location src
 python manage.py migrate
+python manage.py seed_demo
 python manage.py createsuperuser
 ```
+
+The `seed_demo` command creates the demo tenants, users, course, assignment, and learning progress. It is safe to run more than once. The demo users all use `Testpassword123!`.
 
 ## Run the application
 

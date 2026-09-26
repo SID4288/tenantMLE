@@ -29,7 +29,7 @@ const DEMOS = [
     hint: "Tenant A learner",
   },
 ];
-const DEMO_PASSWORD = "password";
+const DEMO_PASSWORD = "Testpassword123!"; // Default development password for demo users.
 
 export default function Login() {
   const { login } = useAuth();
@@ -60,8 +60,6 @@ export default function Login() {
     setPassword(DEMO_PASSWORD);
     setBusy(true);
     setError("");
-
-    // Demo users are seeded with the development password "password".
 
     try {
       await login(demo.username, DEMO_PASSWORD);
@@ -119,7 +117,7 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="current-password"
-                placeholder='Backend seed password (often "password")'
+                placeholder="Demo password: Testpassword123!"
               />
 
               {error && <p className="err">{error}</p>}
@@ -149,8 +147,8 @@ export default function Login() {
             </h3>
 
             <p className="muted">
-              Click a role to fill the username and log in with the password
-              above, or the default development password.
+              Click a role to fill the username and log in with the demo
+              password.
             </p>
 
             <table className="tbl">
