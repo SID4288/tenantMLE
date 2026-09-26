@@ -29,7 +29,7 @@ const DEMOS = [
     hint: "Tenant A learner",
   },
 ];
-const DEMO_PASSWORD = "TestPassword123!";
+const DEMO_PASSWORD = "password";
 
 export default function Login() {
   const { login } = useAuth();
