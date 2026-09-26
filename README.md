@@ -12,17 +12,13 @@ TenantMLE is a multi-tenant learning platform with a Django REST API, PostgreSQL
 
 ### 1. Configure the environment
 
-Create a `.env` file in the project root:
+Copy the example environment file to `.env` in the project root:
 
-```env
-SECRET_KEY=development-secret
-DEBUG=True
-DB_NAME=tenantmle
-DB_USER=tenantmle
-DB_PASSWORD=tenantmle
-DB_HOST=127.0.0.1
-DB_PORT=5433
+```powershell
+Copy-Item .env.example .env
 ```
+
+Open `.env` and replace `SECRET_KEY` with a local development secret.
 
 ### 2. Start PostgreSQL
 

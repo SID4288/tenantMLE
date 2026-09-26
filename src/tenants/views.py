@@ -93,8 +93,6 @@ class TenantViewSet(ModelViewSet):
                 "status": tenant.status,
             }
         )
-
-
 class PublicTenantListView(APIView):
     permission_classes = [AllowAny]
 
