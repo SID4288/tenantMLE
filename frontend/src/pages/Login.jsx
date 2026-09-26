@@ -89,8 +89,7 @@ export default function Login() {
         <h2>Log in</h2>
 
         <p className="lede">
-          Demo mode or your own credentials. Token is stored and attached as
-          Bearer.
+          Demo mode or your own credentials.
         </p>
 
         <div className="grid2">
@@ -119,7 +118,7 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="current-password"
-                placeholder='Backend seed password (often "password")'
+                placeholder='Password'
               />
 
               {error && <p className="err">{error}</p>}
