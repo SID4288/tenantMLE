@@ -1,2 +1,91 @@
-# config
-this is assessment for the MLexperts.ai
+# TenantMLE
+
+TenantMLE is a multi-tenant learning platform with a Django REST API, PostgreSQL database, JWT authentication, and a React/Vite frontend.
+
+## Requirements
+
+- Python 3.13+
+- Node.js and npm
+- Docker Desktop with Docker Compose
+
+## Setup
+
+### 1. Configure the environment
+
+Create a `.env` file in the project root:
+
+```env
+SECRET_KEY=development-secret
+DEBUG=True
+DB_NAME=tenantmle
+DB_USER=tenantmle
+DB_PASSWORD=tenantmle
+DB_HOST=127.0.0.1
+DB_PORT=5433
+```
+
+### 2. Start PostgreSQL
+
+```powershell
+docker compose up -d postgres
+```
+
+### 3. Set up the backend
+
+From the project root:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+Set-Location src
+python manage.py migrate
+python manage.py createsuperuser
+```
+
+## Run the application
+
+### Start the backend
+
+From `src`:
+
+```powershell
+python manage.py runserver 8000
+```
+
+The API is available at <http://localhost:8000/api/>.
+
+### Start the frontend
+
+Open a second terminal:
+
+```powershell
+Set-Location frontend
+npm install
+npm run dev
+```
+
+Open <http://localhost:5173/>.
+
+The frontend automatically proxies API requests to the backend at `http://localhost:8000`.
+
+## Run tests
+
+With PostgreSQL running, from `src`:
+
+```powershell
+python manage.py test
+```
+
+To build the frontend:
+
+```powershell
+Set-Location ..\frontend
+npm run build
+```
+
+## Stop PostgreSQL
+
+```powershell
+docker compose stop postgres
+```
