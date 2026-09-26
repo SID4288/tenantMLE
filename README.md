@@ -20,13 +20,7 @@ Copy-Item .env.example .env
 
 Open `.env` and replace `SECRET_KEY` with a local development secret.
 
-### 2. Start PostgreSQL
-
-```powershell
-docker compose up -d postgres
-```
-
-### 3. Set up the backend
+### 2. Set up the backend
 
 From the project root:
 
@@ -34,6 +28,27 @@ From the project root:
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
+```
+
+Generate a unique Django secret key:
+
+```powershell
+python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+```
+
+Copy the generated value into `.env` as the value of `SECRET_KEY`.
+
+### 3. Start PostgreSQL
+
+```powershell
+docker compose up -d postgres
+```
+
+### 4. Prepare the database
+
+From the project root, with the virtual environment activated:
+
+```powershell
 Set-Location src
 python manage.py migrate
 python manage.py createsuperuser
