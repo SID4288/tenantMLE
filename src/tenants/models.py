@@ -33,5 +33,10 @@ class Tenant(models.Model):
 
         return self.status
 
+    def reactivate(self):
+        self.status = TenantStatus.ACTIVE
+        self.save(update_fields=["status", "updated_at"])
+        return self.status
+
     def __str__(self):
         return self.name
